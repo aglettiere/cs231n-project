@@ -50,7 +50,7 @@ ngf = 64
 ndf = 64
 
 # Number of training epochs
-num_epochs = 10
+num_epochs = 100
 
 # Learning rate for optimizers
 lr = 0.0002
@@ -276,9 +276,13 @@ for epoch in range(num_epochs):
         if (iters % 500 == 0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
             with torch.no_grad():
                 fake = netG(fixed_noise).detach().cpu()
+            vutils.save_image(fake, str(iters)+".png")
             img_list.append(vutils.make_grid(fake, padding=2, normalize=True))
 
         iters += 1
+
+torch.save(netG.state_dict(), "generator.pt")
+torch.save(netD.state_dict(), "discriminator.pt")
 
 plt.figure(figsize=(10,5))
 plt.title("Generator and Discriminator Loss During Training")
@@ -287,11 +291,11 @@ plt.plot(D_losses,label="D")
 plt.xlabel("iterations")
 plt.ylabel("Loss")
 plt.legend()
-plt.show()
+plt.savefig('LossPlot.png')
 
 
 #%%capture
 fig = plt.figure(figsize=(8,8))
 plt.axis("off")
 ims = [[plt.imshow(np.transpose(i,(1,2,0)), animated=True)] for i in img_list]
-plt.show()
+plt.savefig('image_list.png')
