@@ -38,33 +38,57 @@ def blur_line(line_text, img):
 	width = end_idx - start_idx
 	img = blur_word_left_right(min_top, start_idx, width, max_height, img)
 	return img
+def getTextImage(line_text, img):
+	words = line_text["Words"]
+	# print(line_text)
+	max_height = int(line_text["MaxHeight"])
+	start_idx_dim_0 = int(line_text["MinTop"])
+	end_idx_dim_0 = start_idx_dim_0 + max_height
+	start_idx_dim_1 = int(words[0]["Left"])
+	end_idx_dim_1 = int(words[-1]["Left"] + words[-1]["Width"])
+	# width = end_idx - start_idx
+	return img[start_idx_dim_0: end_idx_dim_0, start_idx_dim_1:end_idx_dim_1, :]
 
+def saveBlurredCovers(data):
+	for index, row in data.iterrows():
+		image_path = row.image_path
+		folders = image_path.split("/")
+		image_path = '../' + '/'.join(folders[-3:])
+		ocr_results = literal_eval(row.text_bounds)
+		img = cv2.imread(image_path)
+		covername = folders[-1]
+		if folders[-1] == 'cover_02_1964.jpg':
+			continue
+		print(image_path)
+		year = int(folders[-1].split('.')[0].split("_")[2])
+		# RGB_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+		# plt.imshow(RGB_img)
+		# plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
+		# plt.show()
+		for line_text in ocr_results:
+			img = blur_line(line_text, img)
+		for line_text in ocr_results:
+			img = blur_line(line_text, img)
+		cv2.imwrite("../data/blurred_images/" + str(covername), img)
+
+def saveTextImages(data):
+	for index, row in data.iterrows():
+		image_path = row.image_path
+		folders = image_path.split("/")
+		image_path = '../' + '/'.join(folders[-3:])
+		ocr_results = literal_eval(row.text_bounds)
+		img = cv2.imread(image_path)
+		covername = folders[-1].split('.')[0]
+		if folders[-1] == 'cover_02_1964.jpg':
+			continue
+		# print(image_path)
+		year = int(folders[-1].split('.')[0].split("_")[2])
+		i = 0
+		for line_text in ocr_results:
+			textBox = getTextImage(line_text, img)
+			cv2.imwrite("../data/text_images/" + str(covername) + "_" + str(i) + ".jpg", textBox)
+			i+=1
 csv_path = 'cover_text.csv'
 data = pd.read_csv(csv_path)
-for index, row in data.iterrows():
-	image_path = row.image_path
-	folders = image_path.split("/")
-	image_path = '../' + '/'.join(folders[-3:])
-	ocr_results = literal_eval(row.text_bounds)
-	img = cv2.imread(image_path)
-	covername = folders[-1]
-	if folders[-1] == 'cover_02_1964.jpg':
-		continue
-	print(image_path)
-	year = int(folders[-1].split('.')[0].split("_")[2])
-	# RGB_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-	# plt.imshow(RGB_img)
-	# plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-	# plt.show()
-	for line_text in ocr_results:
-		# print(line_text)
-		img = blur_line(line_text, img)
-	for line_text in ocr_results:
-		img = blur_line(line_text, img)
-	cv2.imwrite("../data/blurred_images/" + str(covername), img)
-	# RGB_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-	# plt.imshow(RGB_img)
-	# plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-	# plt.show()
-	
+saveTextImages(data)
 	
