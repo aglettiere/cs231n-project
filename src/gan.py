@@ -340,6 +340,25 @@ for epoch in range(num_epochs):
         print("Old parameters")
         print(netD_cover_art.parameters())
         new_params = differential_evolution(obj, bounds)
+        '''
+        class Objective(nn.Module):
+            def __init__(self, loss, output, labels):
+                super(Objective, self).__init__()
+                self.loss = loss
+                self.output = output
+                self.labels = labels
+
+                
+
+            def forward(self):
+                # output = self.linear(self.X)
+                return self.loss(output, labels)
+
+
+        objective = Objective(criterion, output, label)
+        obj = PyTorchObjective(objective)
+        xL = optimize.differential_evolution(obj.fun, bounds, callback=verbose)
+        '''
         print("New parameters")
         print(new_params)
         with torch.no_grad():
