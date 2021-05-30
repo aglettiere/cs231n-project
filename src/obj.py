@@ -13,9 +13,6 @@ class PyTorchObjective(object):
         # make an x0 from the parameters in this module
         parameters = OrderedDict(obj_module.named_parameters())
         self.param_shapes = {n:parameters[n].size() for n in parameters}
-        # ravel and concatenate all parameters to make x0
-        self.x0 = np.concatenate([parameters[n].data.numpy().ravel() 
-                                   for n in parameters])
 
     def unpack_parameters(self, x):
         """optimize.minimize will supply 1D array, chop it up for each parameter."""
@@ -31,15 +28,6 @@ class PyTorchObjective(object):
             # update index
             i += param_len
         return named_parameters
-
-    def pack_grads(self):
-        """pack all the gradients from the parameters in the module into a
-        numpy array."""
-        grads = []
-        for p in self.f.parameters():
-            grad = p.grad.data.numpy()
-            grads.append(grad.ravel())
-        return np.concatenate(grads)
 
     def is_new(self, x):
         # if this is the first thing we've seen
@@ -62,9 +50,8 @@ class PyTorchObjective(object):
         # use it to calculate the objective
         obj = self.f()
         # backprop the objective
-        obj.backward()
+        obj.backward(retain_graph=True)
         self.cached_f = obj.item()
-        self.cached_jac = self.pack_grads()
 
     def fun(self, x):
         if self.is_new(x):

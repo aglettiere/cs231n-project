@@ -19,18 +19,8 @@ from IPython.display import HTML
 
 from PIL import Image
 
+
 from scipy.optimize import differential_evolution
-from obj import PyTorchObjective
-
-
-from _linear_system_fixtures import (
-    buddy,
-    generated_data,
-    generated_data_numpy_list,
-    single_step_dataloader,
-    subsequence_dataloader,
-)
-import torchfilter
 
 # Set random seed for reproducibility #
 #manualSeed = 999
@@ -40,9 +30,9 @@ random.seed(manualSeed)
 torch.manual_seed(manualSeed)
 
 # Root directory for dataset
-dataroot_cover_art = '/Users/allisonlettiere/Downloads/cs231n-project/data/cover_art_images_blurred/'
-dataroot_fonts = '/Users/allisonlettiere/Downloads/cs231n-project/data/text_images_transparent/'
-dataroot_full_covers = '/Users/allisonlettiere/Downloads/cs231n-project/cs231n-project/data/full_covers/'
+dataroot_cover_art = '/home/allisonlettiere/cs231n-project/data/cover_art_images_blurred/'
+dataroot_fonts = '/home/allisonlettiere/cs231n-project/data/text_images_transparent/'
+dataroot_full_covers = '/home/allisonlettiere/cs231n-project/cs231n-project/data/full_covers/'
 # Number of workers for dataloader
 workers = 2
 
@@ -75,7 +65,7 @@ lr = 0.0002
 beta1 = 0.5
 
 # Number of GPUs available. Use 0 for CPU mode.
-ngpu = 0
+ngpu = 1
 
 def custom_loader(path):
     with open(path, 'rb') as f:
@@ -241,29 +231,11 @@ real_label = 1.
 fake_label = 0.
 
 # Setup Adam optimizers for both G and D --- try L-BFGS
-'''
-optimizerG_cover_art = optim.Adam(netG_cover_art.parameters(), lr=lr, betas=(beta1, 0.999))
-optimizerG_fonts = optim.Adam(netG_fonts.parameters(), lr=lr, betas=(beta1, 0.999))
+optimizerG_cover_art = optim.LBFGS(netG_cover_art.parameters(), lr=lr, max_iter=20, history_size=100, line_search_fn='strong_wolfe')
+optimizerG_fonts = optim.LBFGS(netG_fonts.parameters(), lr=lr, max_iter=20, history_size=100, line_search_fn='strong_wolfe')
 
-optimizerD_cover_art = optim.Adam(netD_cover_art.parameters(), lr=lr, betas=(beta1, 0.999))
-optimizerD_fonts = optim.Adam(netD_fonts.parameters(), lr=lr, betas=(beta1, 0.999))
-'''
-
-'''
-optimizerG_cover_art = optim.LBFGS(netG_cover_art.parameters(), lr=0.1, max_iter=20, history_size=100, line_search_fn='strong_wolfe')
-optimizerG_fonts = optim.LBFGS(netG_fonts.parameters(), lr=0.1, max_iter=20, history_size=100, line_search_fn='strong_wolfe')
-
-optimizerD_cover_art = optim.LBFGS(netD_cover_art.parameters(), lr=0.1, max_iter=20, history_size=100, line_search_fn='strong_wolfe')
-optimizerD_fonts = optim.LBFGS(netD_fonts.parameters(), lr=0.1, max_iter=20, history_size=100, line_search_fn='strong_wolfe')
-'''
-
-'''
-optimizerG_cover_art = torch.optim.RMSprop(netG_cover_art.parameters(), lr=lr, alpha=0.99, eps=1e-08, weight_decay=0.001, momentum=0)
-optimizerG_fonts = torch.optim.RMSprop(netG_fonts.parameters(), lr=lr, alpha=0.99, eps=1e-08, weight_decay=0.001, momentum=0)
-
-optimizerD_cover_art = torch.optim.RMSprop(netD_cover_art.parameters(), lr=lr, alpha=0.99, eps=1e-08, weight_decay=0.001, momentum=0)
-optimizerD_fonts = torch.optim.RMSprop(netD_fonts.parameters(), lr=lr, alpha=0.99, eps=1e-08, weight_decay=0.001, momentum=0)
-'''
+optimizerD_cover_art = optim.LBFGS(netD_cover_art.parameters(), lr=lr, max_iter=20, history_size=100, line_search_fn='strong_wolfe')
+optimizerD_fonts = optim.LBFGS(netD_fonts.parameters(), lr=lr, max_iter=20, history_size=100, line_search_fn='strong_wolfe')
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
@@ -297,6 +269,7 @@ for epoch in range(num_epochs):
         ## Train with all-real batch
         netD_cover_art.zero_grad()
         # Format batch
+        #real_cpu = data[0][0].to(device)
         real_cpu = data[0].to(device)
         b_size = real_cpu.size(0)
         label = torch.full((b_size,), real_label, dtype=torch.float, device=device)
@@ -317,22 +290,24 @@ for epoch in range(num_epochs):
         # Classify all fake batch with D
         output = netD_cover_art(fake_covers.detach()).view(-1)
         # Calculate D's loss on the all-fake batch
-        errD_cover_art_fake = criterion(output, label)
+        #errD_cover_art_fake = criterion(output, label)
         # Calculate the gradients for this batch, accumulated (summed) with previous gradients
         #errD_cover_art_fake.backward()
         D_G_z1_cover_art = output.mean().item()
         # Compute error of D as sum over the fake and the real batches
-        errD_cover_art = errD_covert_art_real + errD_cover_art_fake
+        #errD_cover_art = errD_covert_art_real + errD_cover_art_fake
         # Update D
-        obj = errD_cover_art_fake.item()
-        #optimizerD_cover_art.step()
 
-        torchfilter.train.train_dynamics_single_step(
-            buddy, dynamics_model, single_step_dataloader
-        )
+        ## L-BFGS Addition
+        def closure_d_cover_art():
+            optimizerD_cover_art.zero_grad()
+            output = netD_cover_art(fake_covers.detach()).view(-1)
+            errD_cover_art_fake = criterion(output, label)
+            errD_cover_art_fake.backward(retain_graph=True)
+            return errD_cover_art_fake
 
-        #with torch.no_grad():
-            #netD_cover_art.parameters().copy_(new_params)
+        errD_cover_art_fake = optimizerD_cover_art.step(closure_d_cover_art)
+        errD_cover_art = errD_covert_art_real + errD_cover_art_fake
 
         ############################
         # (2) Update G network: maximize log(D(G(z)))
@@ -343,11 +318,18 @@ for epoch in range(num_epochs):
         # Since we just updated D, perform another forward pass of all-fake batch through D
         output = netD_cover_art(fake_covers).view(-1)
         # Calculate G's loss based on this output
-        errG_cover_art = criterion(output, label)
+        #errG_cover_art = criterion(output, label)
         # Calculate gradients for G
         D_G_z2_cover_art = output.mean().item()
         # Update G
-        optimizerG_cover_art.step()
+        def closure_g_cover_art():
+            optimizerG_cover_art.zero_grad()
+            output = netD_cover_art(fake_covers.detach()).view(-1)
+            errG_cover_art = criterion(output, label)
+            errG_cover_art.backward(retain_graph=True)
+            return errG_cover_art
+
+        errG_cover_art = optimizerG_cover_art.step(closure_g_cover_art)
 
         # Output training stats
         if i % 50 == 0:
@@ -364,8 +346,11 @@ for epoch in range(num_epochs):
             with torch.no_grad():
                 fake_cover_art = netG_cover_art(fixed_noise).detach().cpu()
             
-            vutils.save_image(fake_cover_art, "l-bfgs/cover_art_epoch_" +str(epoch)+".png")
-            
+            vutils.save_image(fake_cover_art, "cover_art_epoch_" +str(epoch)+".png")
+
+            for i in range(fake_cover_art.size(0)):
+                vutils.save_image(fake_cover_art[i, :, :, :], 'cover_art_epoch_{}_{}.png'.format(epoch, i))
+
             cover_art_img_list.append(vutils.make_grid(fake_cover_art, padding=2, normalize=True))
             cover_image_dict[epoch] = fake_cover_art
 
@@ -380,6 +365,7 @@ for epoch in range(num_epochs):
         ## Train with all-real batch
         netD_fonts.zero_grad()
         # Format batch
+        #real_cpu = data[0][0].to(device)
         real_cpu = data[0].to(device)
         b_size = real_cpu.size(0)
         label = torch.full((b_size,), real_label, dtype=torch.float, device=device)
@@ -395,66 +381,76 @@ for epoch in range(num_epochs):
         # Generate batch of latent vectors
         noise = torch.randn(b_size, nz, 1, 1, device=device)
         # Generate fake image batch with G
-        fake_fonts = netG_fonts(noise)
+        fake_font = netG_fonts(noise)
         label.fill_(fake_label)
         # Classify all fake batch with D
-        output = netD_fonts(fake_fonts.detach()).view(-1)
+        output = netD_fonts(fake_font.detach()).view(-1)
         # Calculate D's loss on the all-fake batch
-        errD_fonts_fake = criterion(output, label)
+        #errD_cover_art_fake = criterion(output, label)
         # Calculate the gradients for this batch, accumulated (summed) with previous gradients
-        errD_fonts_fake.backward()
+        #errD_cover_art_fake.backward()
         D_G_z1_fonts = output.mean().item()
         # Compute error of D as sum over the fake and the real batches
-        errD_fonts = errD_fonts_real + errD_fonts_fake
+        #errD_cover_art = errD_covert_art_real + errD_cover_art_fake
         # Update D
-        optimizerD_fonts.step()
+
+        ## L-BFGS Addition
+        def closure_d_fonts():
+            optimizerD_fonts.zero_grad()
+            output = netD_fonts(fake_font.detach()).view(-1)
+            errD_fonts_fake = criterion(output, label)
+            errD_fonts_fake.backward(retain_graph=True)
+            return errD_fonts_fake
+
+        errD_fonts_fake = optimizerD_fonts.step(closure_d_fonts)
+        errD_fonts = errD_fonts_real + errD_fonts_fake
 
         ############################
         # (2) Update G network: maximize log(D(G(z)))
         ###########################
-        output = netD_fonts(fake_fonts).view(-1)
+        netG_fonts.zero_grad()
+        #netG_fonts.zero_grad()
+        label.fill_(real_label)  # fake labels are real for generator cost
+        # Since we just updated D, perform another forward pass of all-fake batch through D
+        output = netD_fonts(fake_font).view(-1)
         # Calculate G's loss based on this output
-        errG_fonts = criterion(output, label)
+        #errG_cover_art = criterion(output, label)
         # Calculate gradients for G
-        errG_fonts.backward()
         D_G_z2_fonts = output.mean().item()
         # Update G
-        optimizerG_fonts.step(closure_g_fonts)
+        def closure_g_fonts():
+            optimizerG_fonts.zero_grad()
+            output = netD_fonts(fake_font.detach()).view(-1)
+            errG_fonts = criterion(output, label)
+            errG_fonts.backward(retain_graph=True)
+            return errG_fonts
+
+        errG_fonts = optimizerG_fonts.step(closure_g_fonts)
 
         # Output training stats
         if i % 50 == 0:
-            print('[%d/%d][%d/%d]\tFont Images Loss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
+            print('[%d/%d][%d/%d]\tFonts Loss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
                   % (epoch + 1, num_epochs, i, len(dataloader_fonts),
                      errD_fonts.item(), errG_fonts.item(), D_fonts_x, D_G_z1_fonts, D_G_z2_fonts))
 
         # Save Losses for plotting later
         G_font_losses.append(errG_fonts.item())
         D_font_losses.append(errD_fonts.item())
-
+        
         # Check how the generator is doing by saving G's output on fixed_noise
         if (iters % 50 == 0) or ((epoch == num_epochs-1) and (i == len(dataloader_fonts)-1)):
             with torch.no_grad():
                 fake_fonts = netG_fonts(fixed_noise).detach().cpu()
             
-            vutils.save_image(fake_fonts, "l-bfgs/fonts_epoch_" +str(epoch)+".png")
+            vutils.save_image(fake_fonts, "fonts_epoch_" +str(epoch)+".png")
+
+            for i in range(fake_cover_art.size(0)):
+                vutils.save_image(fake_fonts[i, :, :, :], 'fonts_epoch_{}_{}.png'.format(epoch, i))
             
             font_img_list.append(vutils.make_grid(fake_fonts, padding=2, normalize=True))
             font_image_dict[epoch] = fake_fonts
 
         iters = iters + 1
-#torch.save(netG.state_dict(), "generator_mixed.pt")
-#torch.save(netD.state_dict(), "discriminator_mixed.pt")
-
-composite_iters = 0
-for image_epoch in font_image_dict:
-    print(image_epoch)
-    for image_pair in zip(cover_image_dict[image_epoch], font_image_dict[image_epoch]):
-        fake_cover_art_image, fake_font_image = image_pair
-        cover_art_pil = transforms.ToPILImage()(fake_cover_art_image.squeeze_(0)).convert('RGBA')
-        font_img_pil = transforms.ToPILImage()(fake_font_image.squeeze_(0)).convert('RGBA')
-        image_composite = Image.alpha_composite(cover_art_pil, font_img_pil)
-        image_composite.save('l-bfgs/composite_image_epoch_' + str(image_epoch) + '_image_' + str(composite_iters) + '.png', 'PNG')
-        composite_iters += 1
 
 plt.figure(figsize=(10,5))
 plt.title("Generator and Discriminator Losses During Training")
@@ -465,9 +461,4 @@ plt.plot(D_font_losses,label="D Font")
 plt.xlabel("iterations")
 plt.ylabel("Loss")
 plt.legend()
-plt.savefig('l-bfgs/LossPlotTwoGTwoD.png')
-
-'''fig = plt.figure(figsize=(8,8))
-plt.axis("off")
-ims = [[plt.imshow(np.transpose(i,(1,2,0)), animated=True)] for i in img_list]
-plt.savefig('image_list.png')'''
+plt.savefig('LossPlotTwoGTwoD.png')
