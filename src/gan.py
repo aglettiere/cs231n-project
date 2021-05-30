@@ -20,17 +20,6 @@ from IPython.display import HTML
 from PIL import Image
 
 from scipy.optimize import differential_evolution
-from obj import PyTorchObjective
-
-
-from _linear_system_fixtures import (
-    buddy,
-    generated_data,
-    generated_data_numpy_list,
-    single_step_dataloader,
-    subsequence_dataloader,
-)
-import torchfilter
 
 # Set random seed for reproducibility #
 #manualSeed = 999
